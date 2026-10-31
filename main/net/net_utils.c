@@ -21,6 +21,16 @@
 
 static const char *TAG = "ESP_WOL_NET";
 
+// O driver do IDF não reconecta sozinho: sem isto, uma queda do roteador deixa
+// a estação desassociada para sempre e o WS tenta reconectar sem rede por baixo.
+static void wifi_disconnected_handler(void *arg, esp_event_base_t base,
+                                      int32_t event_id, void *event_data)
+{
+    wifi_event_sta_disconnected_t *ev = (wifi_event_sta_disconnected_t *)event_data;
+    ESP_LOGW(TAG, "WiFi disconnected (reason=%d); reconnecting", ev->reason);
+    esp_wifi_connect();
+}
+
 void wifi_init(void)
 {
     esp_netif_init();
@@ -29,6 +39,9 @@ void wifi_init(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&cfg);
+
+    esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED,
+                               wifi_disconnected_handler, NULL);
 
     wifi_config_t wifi_config = {
         .sta = {
